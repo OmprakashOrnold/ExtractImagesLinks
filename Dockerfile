@@ -7,7 +7,7 @@ RUN mvn clean
 RUN mvn package -DskipTests
 
 FROM openjdk:17-jdk-alpine
-COPY --from=build /blogapp/target/*.jar extractimagelinks.jar
+COPY --from=build /extractimagelinks/target/*.jar extractimagelinks.jar
 EXPOSE 9090
 CMD ["java","-jar","extractimagelinks.jar"]
 

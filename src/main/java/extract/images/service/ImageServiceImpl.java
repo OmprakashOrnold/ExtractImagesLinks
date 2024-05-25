@@ -25,6 +25,7 @@ public class ImageServiceImpl implements ImageService {
     public static String timestamp;
 
     private JSONObject fetchJsonData(ImageUrlReqest imageUrlReqest) {
+        log.info( "Requested url is {} ", imageUrlReqest.getUrl().trim().toLowerCase());
         String htmlString = JSONUtils.readJSONFromUrlWithOkhttp(imageUrlReqest.getUrl().trim().toLowerCase());
         String jsonString = JSONUtils.extractJsonFromScriptTag(htmlString, JsonKeys.IDENTIFY_JSON_STRING.getValue());
         return JSONUtils.parseJsonStringToJsonObject(jsonString);

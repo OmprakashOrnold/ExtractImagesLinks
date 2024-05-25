@@ -2,7 +2,7 @@ package extract.images.keys;
 
 public enum JsonKeys {
     IDENTIFY_JSON_STRING("script[id=__NEXT_DATA__]"),
-    TARGET_URL("https://brothersphotographyj.zenfoliosite.com/sai-krishna--nikitha-prewed-1?mediaId=3be48791-0d0f-49f8-8051-291fef896c29"),
+    TARGET_URL("https://brothersphotographyj.zenfoliosite.com/prewedding-catalog?mediaId=a6408b6b-f05a-4f19-ba6a-c81ffcb0a3c6"),
 
     LEVEL_ONE_OBJECT("props"),
     LEVEL_TWO_OBJECT("pageProps"),

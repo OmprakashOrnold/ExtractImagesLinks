@@ -1,5 +1,6 @@
 package extract.images.service;
 
+import extract.images.dtos.ImageUrlReqest;
 import extract.images.entities.Image;
 import extract.images.keys.JsonKeys;
 import extract.images.service.ImageService;
@@ -10,91 +11,126 @@ import org.springframework.stereotype.Service;
 
 import java.util.List;
 import java.util.Objects;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 @Service
 @Slf4j
 public class ImageServiceImpl implements ImageService {
 
-    private JSONObject fetchJsonData() {
-        String htmlString = JSONUtils.readJSONFromUrlWithOkhttp(JsonKeys.TARGET_URL.getValue());
+    public static String folderId;
+    public static String hmac;
+    public static String timestamp;
+
+    private JSONObject fetchJsonData(ImageUrlReqest imageUrlReqest) {
+        String htmlString = JSONUtils.readJSONFromUrlWithOkhttp(imageUrlReqest.getUrl().trim().toLowerCase());
         String jsonString = JSONUtils.extractJsonFromScriptTag(htmlString, JsonKeys.IDENTIFY_JSON_STRING.getValue());
         return JSONUtils.parseJsonStringToJsonObject(jsonString);
     }
 
     @Override
-    public List<Image> getImageInformation() {
-        JSONObject jsonObject = fetchJsonData();
-        JSONObject levelOneObject = JSONUtils.getSpecificJSONObject(jsonObject, JsonKeys.LEVEL_ONE_OBJECT.getValue());
-        JSONObject levelTwoObject = JSONUtils.getSpecificJSONObject(levelOneObject, JsonKeys.LEVEL_TWO_OBJECT.getValue());
-        JSONObject levelThreeObject = JSONUtils.getSpecificJSONObject(levelTwoObject, JsonKeys.LEVEL_THREE_OBJECT.getValue());
-        JSONObject levelFourObject = JSONUtils.getSpecificJSONObject(levelThreeObject, JsonKeys.LEVEL_FOUR_OBJECT.getValue());
-        List<JSONObject> levelOneArray = JSONUtils.getInnerJSONArrayJSONObjectList(levelFourObject, JsonKeys.LEVEL_ONE_ARRAY.getValue());
+    public List<Image> getImageInformation(ImageUrlReqest imageUrlReqest) {
+        JSONObject jsonObject = fetchJsonData(imageUrlReqest);
+        JSONObject levelThreeObject = getLevelThreeObject(jsonObject);
+        folderId = levelThreeObject.getString("id");
+        hmac = extractHmac(levelThreeObject.getString("photoUrlTemplate"));
+        timestamp = extractTimestamp(hmac);
+        JSONObject levelFourObject = getLevelFourObject(levelThreeObject);
+        List<JSONObject> levelOneArray = getLevelOneArray(levelFourObject);
 
-        // Using Streams to process the JSONObjects and collect Image objects
         List<Image> imageList = levelOneArray.stream()
-                .flatMap(jsonObj -> {
-                    try {
-                        return JSONUtils.getInnerJSONArrayJSONObjectList(jsonObj, JsonKeys.LEVEL_TWO_ARRAY.getValue()).stream();
-                    } catch (Exception e) {
-                        log.error("Error processing jsonObj", e);
-                        return null;
-                    }
-                })
-                .filter(Objects::nonNull) // Filter out nulls
-                .map(jsonInnerObj -> {
-                    try {
-                        return Image.builder()
-                                .id(jsonInnerObj.getString(JsonKeys.FIELD_VALUE_1.getValue()))
-                                .size(jsonInnerObj.getInt(JsonKeys.FIELD_VALUE_2.getValue()))
-                                .width(jsonInnerObj.getInt(JsonKeys.FIELD_VALUE_3.getValue()))
-                                .height(jsonInnerObj.getInt(JsonKeys.FIELD_VALUE_4.getValue()))
-                                .fileName(jsonInnerObj.getString(JsonKeys.FIELD_VALUE_5.getValue()))
-                                .imageUrl("https://zenfolio.creatorcdn.com/a4e63763-b374-4d89-bd0e-99f7203da30b/0/1/0/X2XL/0-0-0/"+jsonInnerObj.getString(JsonKeys.FIELD_VALUE_1.getValue())+"/1/1/27.jpg?fjkss=exp=1720024200~hmac=11382815ded447c211f556aaffcf81e35cbdd049d4c82c6fcc2042ede97badb7")
-                                .build();
-                    } catch (Exception e) {
-                        log.error("Error retrieving jsonInnerObj", e);
-                        return null;
-                    }
-                })
-                .filter(Objects::nonNull) // Filter out nulls
+                .flatMap(this::getInnerJSONArrayJSONObjectList)
+                .filter(Objects::nonNull)
+                .map(this::buildImage)
+                .filter(Objects::nonNull)
                 .collect(Collectors.toList());
 
         return imageList;
     }
 
-    public List<String> getImageUrls() {
-        JSONObject jsonObject = fetchJsonData();
-        JSONObject levelOneObject = JSONUtils.getSpecificJSONObject(jsonObject, JsonKeys.LEVEL_ONE_OBJECT.getValue());
-        JSONObject levelTwoObject = JSONUtils.getSpecificJSONObject(levelOneObject, JsonKeys.LEVEL_TWO_OBJECT.getValue());
-        JSONObject levelThreeObject = JSONUtils.getSpecificJSONObject(levelTwoObject, JsonKeys.LEVEL_THREE_OBJECT.getValue());
-        JSONObject levelFourObject = JSONUtils.getSpecificJSONObject(levelThreeObject, JsonKeys.LEVEL_FOUR_OBJECT.getValue());
-        List<JSONObject> levelOneArray = JSONUtils.getInnerJSONArrayJSONObjectList(levelFourObject, JsonKeys.LEVEL_ONE_ARRAY.getValue());
+    @Override
+    public List<String> getImageUrls(ImageUrlReqest imageUrlReqest) {
+        JSONObject jsonObject = fetchJsonData(imageUrlReqest);
+        JSONObject levelThreeObject = getLevelThreeObject(jsonObject);
+        folderId = levelThreeObject.getString("id");
+        hmac = extractHmac(levelThreeObject.getString("photoUrlTemplate"));
+        timestamp = extractTimestamp(levelThreeObject.getString("photoUrlTemplate"));
+        JSONObject levelFourObject = getLevelFourObject(levelThreeObject);
+        List<JSONObject> levelOneArray = getLevelOneArray(levelFourObject);
 
-        // Using Streams to process the JSONObjects and collect Image URLs
         List<String> imageUrls = levelOneArray.stream()
-                .flatMap(jsonObj -> {
-                    try {
-                        return JSONUtils.getInnerJSONArrayJSONObjectList(jsonObj, JsonKeys.LEVEL_TWO_ARRAY.getValue()).stream();
-                    } catch (Exception e) {
-                        log.error("Error processing jsonObj", e);
-                        return null;
-                    }
-                })
-                .filter(Objects::nonNull) // Filter out nulls
-                .map(jsonInnerObj -> {
-                    try {
-                        return "https://zenfolio.creatorcdn.com/a4e63763-b374-4d89-bd0e-99f7203da30b/0/1/0/X2XL/0-0-0/" + jsonInnerObj.getString(JsonKeys.FIELD_VALUE_1.getValue()) + "/1/1/27.jpg?fjkss=exp=1720024200~hmac=11382815ded447c211f556aaffcf81e35cbdd049d4c82c6fcc2042ede97badb7";
-                    } catch (Exception e) {
-                        log.error("Error retrieving jsonInnerObj", e);
-                        return null;
-                    }
-                })
-                .filter(Objects::nonNull) // Filter out nulls
+                .flatMap(this::getInnerJSONArrayJSONObjectList)
+                .filter(Objects::nonNull)
+                .map(this::buildImageUrl)
+                .filter(Objects::nonNull)
                 .collect(Collectors.toList());
 
         return imageUrls;
     }
 
+    private JSONObject getLevelThreeObject(JSONObject jsonObject) {
+        JSONObject levelOneObject = JSONUtils.getSpecificJSONObject(jsonObject, JsonKeys.LEVEL_ONE_OBJECT.getValue());
+        JSONObject levelTwoObject = JSONUtils.getSpecificJSONObject(levelOneObject, JsonKeys.LEVEL_TWO_OBJECT.getValue());
+        return JSONUtils.getSpecificJSONObject(levelTwoObject, JsonKeys.LEVEL_THREE_OBJECT.getValue());
+    }
+
+    private JSONObject getLevelFourObject(JSONObject levelThreeObject) {
+        return JSONUtils.getSpecificJSONObject(levelThreeObject, JsonKeys.LEVEL_FOUR_OBJECT.getValue());
+    }
+
+    private List<JSONObject> getLevelOneArray(JSONObject levelFourObject) {
+        return JSONUtils.getInnerJSONArrayJSONObjectList(levelFourObject, JsonKeys.LEVEL_ONE_ARRAY.getValue());
+    }
+
+    private Stream<JSONObject> getInnerJSONArrayJSONObjectList(JSONObject jsonObj) {
+        try {
+            return JSONUtils.getInnerJSONArrayJSONObjectList(jsonObj, JsonKeys.LEVEL_TWO_ARRAY.getValue()).stream();
+        } catch (Exception e) {
+            log.error("Error processing jsonObj", e);
+            return null;
+        }
+    }
+
+    private Image buildImage(JSONObject jsonInnerObj) {
+        try {
+            return Image.builder()
+                    .id(jsonInnerObj.getString(JsonKeys.FIELD_VALUE_1.getValue()))
+                    .size(jsonInnerObj.getInt(JsonKeys.FIELD_VALUE_2.getValue()))
+                    .width(jsonInnerObj.getInt(JsonKeys.FIELD_VALUE_3.getValue()))
+                    .height(jsonInnerObj.getInt(JsonKeys.FIELD_VALUE_4.getValue()))
+                    .fileName(jsonInnerObj.getString(JsonKeys.FIELD_VALUE_5.getValue()))
+                    .imageUrl(buildImageUrl(jsonInnerObj))
+                    .build();
+        } catch (Exception e) {
+            log.error("Error retrieving jsonInnerObj", e);
+            return null;
+        }
+    }
+
+    private String buildImageUrl(JSONObject jsonInnerObj) {
+        try {
+            return "https://zenfolio.creatorcdn.com/" + folderId + "/0/1/0/X2XL/0-0-0/" + jsonInnerObj.getString(JsonKeys.FIELD_VALUE_1.getValue()) + "/1/1/" + jsonInnerObj.getString(JsonKeys.FIELD_VALUE_5.getValue()) + "?fjkss=exp=" + timestamp + "~hmac=" + hmac;
+        } catch (Exception e) {
+            log.error("Error retrieving jsonInnerObj", e);
+            return null;
+        }
+    }
+
+    private String extractHmac(String photoUrlTemplate) {
+        String[] hmacArray = photoUrlTemplate.split("hmac=");
+        return hmacArray[1].trim();
+    }
+
+    private String extractTimestamp(String photoUrlTemplate) {
+        String[] hmacArray = photoUrlTemplate.split("hmac=");
+        Pattern pattern = Pattern.compile("exp=(\\d+)");
+        Matcher matcher = pattern.matcher(hmacArray[0].trim());
+        if (matcher.find()) {
+            return matcher.group(1);
+        }
+        return null;
+    }
 
 }

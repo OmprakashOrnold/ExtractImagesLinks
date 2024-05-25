@@ -1,13 +1,12 @@
 package extract.images.controller;
 
+import extract.images.dtos.ImageUrlReqest;
 import extract.images.entities.Image;
 import extract.images.service.ImageService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
@@ -18,13 +17,13 @@ public class ImageController {
 
     private final ImageService imageService;
 
-    @GetMapping("/images-info")
-    public ResponseEntity<List<Image>> getImages() {
-       return ResponseEntity.ok(imageService.getImageInformation());
+    @PostMapping("/images-info")
+    public ResponseEntity<List<Image>> getImages(@RequestBody ImageUrlReqest imageUrlReqest) {
+       return ResponseEntity.ok(imageService.getImageInformation(imageUrlReqest));
     }
 
-    @GetMapping("/image-urls")
-    public ResponseEntity<List<String>> getImageUrls() {
-        return ResponseEntity.ok(imageService.getImageUrls());
+    @PostMapping("/request-image-urls")
+    public ResponseEntity<List<String>> getImageUrls(@RequestBody ImageUrlReqest imageUrlReqest) {
+        return ResponseEntity.ok(imageService.getImageUrls(imageUrlReqest));
     }
 }

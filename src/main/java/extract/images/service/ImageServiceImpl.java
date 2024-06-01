@@ -112,7 +112,7 @@ public class ImageServiceImpl implements ImageService {
 
     private String buildImageUrl(JSONObject jsonInnerObj) {
         try {
-            return "https://zenfolio.creatorcdn.com/" + folderId + "/0/1/0/X2XL/0-0-0/" + jsonInnerObj.getString(JsonKeys.FIELD_VALUE_1.getValue()) + "/1/1/" + jsonInnerObj.getString(JsonKeys.FIELD_VALUE_5.getValue()) + "?fjkss=exp=" + timestamp + "~hmac=" + hmac;
+            return ("https://zenfolio.creatorcdn.com/" + folderId + "/0/1/0/X2XL/0-0-0/" + jsonInnerObj.getString(JsonKeys.FIELD_VALUE_1.getValue().trim()) + "/1/1/" + jsonInnerObj.getString(JsonKeys.FIELD_VALUE_5.getValue().trim()) + "?fjkss=exp=" + timestamp + "~hmac=" + hmac).replace( " ","%" );
         } catch (Exception e) {
             log.error("Error retrieving jsonInnerObj", e);
             return null;
